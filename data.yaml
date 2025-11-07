@@ -1,0 +1,18 @@
+names:
+  - Pistol
+  - fire weapon
+  - handgun
+  - knife
+  - long weapon
+  - rifle
+  - shotgun
+nc: 7
+roboflow:
+  license: CC BY 4.0
+  project: all-weapons-data-jqimy
+  url: https://universe.roboflow.com/custome-yolo/all-weapons-data-jqimy/dataset/1
+  version: 1
+  workspace: custome-yolo
+test: ../test/images
+train: ../train/images
+val: ../valid/images
