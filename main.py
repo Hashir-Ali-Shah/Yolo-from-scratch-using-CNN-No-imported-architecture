@@ -1,4 +1,3 @@
-# app_with_class.py
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 import cv2
