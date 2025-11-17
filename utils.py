@@ -31,3 +31,11 @@ def read_image(image_path):
     if image is None:
         raise FileNotFoundError(f"Image not found at path: {image_path}")
     return image
+
+def show_image(image):
+    """
+    Display an image in a window.
+    """
+    cv2.imshow("Image", image)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
