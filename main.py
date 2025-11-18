@@ -1,9 +1,12 @@
 from fastapi import FastAPI, UploadFile, File, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import cv2
 import numpy as np
 import base64
 from inference import YOLOInference 
+import os
+import tempfile
+import uuid
 
 app = FastAPI(title="YOLO Inference API")
 
@@ -29,32 +32,36 @@ async def predict_image(file: UploadFile = File(...)):
     return JSONResponse({"image": img_base64})
 
 
-from fastapi.responses import FileResponse
-import os
+
 
 @app.post("/predict/video/full")
 async def predict_video(file: UploadFile = File(...)):
-    contents = await file.read()
-    input_path = "temp_input_video.mp4"
-    with open(input_path, "wb") as f:
-        f.write(contents)
+    input_path = os.path.join(tempfile.gettempdir(), f"input_{uuid.uuid4().hex}.mp4")
+    output_path = os.path.join(tempfile.gettempdir(), f"output_{uuid.uuid4().hex}.mp4")
 
-    frames = yolo_inf.get_full_video(input_path)
+    try:
+        contents = await file.read()
+        with open(input_path, "wb") as f:
+            f.write(contents)
 
-    output_path = "processed_video.mp4"
+        frames = yolo_inf.get_full_video(input_path)
+        if not frames:
+            return JSONResponse({"error": "No frames found in video"}, status_code=400)
 
-    height, width, _ = frames[0].shape
+        height, width, _ = frames[0].shape
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        out = cv2.VideoWriter(output_path, fourcc, 30, (width, height))
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  
-    out = cv2.VideoWriter(output_path, fourcc, 30, (width, height))  
+        for frame in frames:
+            out.write(frame)
+        out.release()
 
-    for frame in frames:
-        out.write(frame)
-    out.release()
+        return FileResponse(output_path, media_type="video/mp4", filename="processed_video.mp4")
 
-    os.remove(input_path)
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
 
-    return FileResponse(output_path, media_type="video/mp4", filename="processed_video.mp4")
 
 
 @app.websocket("/ws/video/stream")
@@ -62,19 +69,24 @@ async def video_stream(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            data = await websocket.receive_text()
-            frame_bytes = base64.b64decode(data)
-            npimg = np.frombuffer(frame_bytes, np.uint8)
-            frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+            try:
+                data = await websocket.receive_text()
+                frame_bytes = base64.b64decode(data)
+                npimg = np.frombuffer(frame_bytes, np.uint8)
+                frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+                if frame is None:
+                    continue 
 
-            annotated, _ = yolo_inf.process_image(frame=frame)
+                annotated, _ = yolo_inf.process_image(frame=frame)
 
-            out_base64 = frame_to_base64(annotated)
-            await websocket.send_text(out_base64)
+                out_base64 = frame_to_base64(annotated)
+                await websocket.send_text(out_base64)
+
+            except Exception as e:
+                await websocket.send_text(f"ERROR: {str(e)}")
 
     except WebSocketDisconnect:
         print("Client disconnected")
-
 
 @app.get("/")
 def read_root():
