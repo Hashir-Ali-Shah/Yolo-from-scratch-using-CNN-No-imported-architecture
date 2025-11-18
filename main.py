@@ -114,7 +114,7 @@ async def video_stream(websocket: WebSocket):
 
 @app.get("/")
 def read_root():
-    return {"message": "YOLOInference API running"}
+    return {"message": "YOLOInference API running."}
 
 @app.post("/predict/image/json")
 async def predict_image_json(file: UploadFile = File(...)):
