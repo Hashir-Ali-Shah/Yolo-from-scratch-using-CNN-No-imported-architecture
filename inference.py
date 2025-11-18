@@ -1,15 +1,23 @@
 from ultralytics import YOLO
 import cv2
+import json
 
 class YOLOInference:
-    def __init__(self, model_path, device="cuda",GPU=False, imgsz=640, conf=0.25):
+    def __init__(self,model_path="",default=False,  device="cuda",GPU=False, imgsz=640, conf=0.25):
         """
         model_path: path to trained YOLO weights
         device: "cuda" or "cpu"
         imgsz: model input size (height & width)
         conf: confidence threshold
         """
-        self.model = YOLO(model_path)
+        if default:
+            self.model = YOLO("yolov8n.pt") 
+            print("Loaded default pretrained model: YOLOv8n")
+        elif model_path:
+            self.model = YOLO(model_path)
+            print(f"Loaded custom model from: {model_path}")
+        else:
+            raise ValueError("Must provide a 'model_path' or set 'default=True'.")
         if GPU:
             self.model.to(device)
         self.imgsz = imgsz
@@ -62,3 +70,14 @@ class YOLOInference:
         results = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
         annotated = results[0].plot()
         return annotated, results[0]
+
+    def get_json_values(self , image_path=None, frame=None):
+        if image_path:
+            frame = cv2.imread(image_path)
+            if frame is None:
+                raise FileNotFoundError(f"Image not found: {image_path}")
+        elif frame is None:
+            raise ValueError("Provide either image_path or frame (numpy array)")
+
+        results = self.model.predict(frame, conf=self.conf, imgsz=self.imgsz, verbose=False)
+        return json.loads(results[0].tojson())

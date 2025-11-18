@@ -25,40 +25,68 @@ async def predict_image(file: UploadFile = File(...)):
 
     annotated, result = yolo_inf.process_image(frame=frame)
     img_base64 = frame_to_base64(annotated)
+
     return JSONResponse({"image": img_base64})
 
+
+from fastapi.responses import FileResponse
+import os
 
 @app.post("/predict/video/full")
 async def predict_video(file: UploadFile = File(...)):
     contents = await file.read()
-    temp_path = "temp_video.mp4"
-    with open(temp_path, "wb") as f:
+    input_path = "temp_input_video.mp4"
+    with open(input_path, "wb") as f:
         f.write(contents)
 
-    frames = yolo_inf.get_full_video(temp_path)
-    frames_base64 = [frame_to_base64(f) for f in frames]
-    return JSONResponse({"frames": frames_base64})
+    frames = yolo_inf.get_full_video(input_path)
+
+    output_path = "processed_video.mp4"
+
+    height, width, _ = frames[0].shape
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")  
+    out = cv2.VideoWriter(output_path, fourcc, 30, (width, height))  
+
+    for frame in frames:
+        out.write(frame)
+    out.release()
+
+    os.remove(input_path)
+
+    return FileResponse(output_path, media_type="video/mp4", filename="processed_video.mp4")
+
 
 @app.websocket("/ws/video/stream")
 async def video_stream(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-
             data = await websocket.receive_text()
             frame_bytes = base64.b64decode(data)
             npimg = np.frombuffer(frame_bytes, np.uint8)
             frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
 
-            annotated_gen = yolo_inf.stream_video_frames_from_frame(frame)
+            annotated, _ = yolo_inf.process_image(frame=frame)
 
-            annotated = next(annotated_gen)
             out_base64 = frame_to_base64(annotated)
             await websocket.send_text(out_base64)
 
     except WebSocketDisconnect:
         print("Client disconnected")
 
+
 @app.get("/")
 def read_root():
     return {"message": "YOLOInference API running"}
+
+
+@app.post("/predict/image/json")
+async def predict_image_json(file: UploadFile = File(...)):
+    contents = await file.read()
+    npimg = np.frombuffer(contents, np.uint8)
+    frame = cv2.imdecode(npimg, cv2.IMREAD_COLOR)
+
+    detections = yolo_inf.process_image_json(frame=frame)
+
+    return JSONResponse({"detections": detections})
