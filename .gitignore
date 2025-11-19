@@ -1,6 +1,6 @@
-/Yolo_results/
+Yolo_results/*
+!Yolo_results/weapons_train2/weights/last.pt
 /All-weapons-data-1/
 /runs/
 /__pycache__/
-*.pt
 *.mp4
