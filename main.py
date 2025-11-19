@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="YOLO Inference API")
 
-model_path = r"D:\ML\Tasks\CNN\Yolo_results\weapons_train2\weights\last.pt"
+model_path = r".\Yolo_results\weapons_train2\weights\last.pt"
 yolo_inf = YOLOInference(model_path=model_path, device="cuda", imgsz=640, conf=0.25)
 
 def frame_to_base64(frame):
